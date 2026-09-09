@@ -203,6 +203,16 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .whoami { text-align: right; line-height: 1.3; }
 .who-name { font-size: 13px; font-weight: 600; color: #fff; }
 .who-role { font-size: 11px; color: var(--gold); }
-.signout { background: none; color: #e7e5e4; border: 1px solid #6b4436; padding: 7px 13px; }
-.signout:hover { background: #4a2a20; color: #fff; }
+/* Two classes, so this beats `.btn` and `.btn.ghost`. The earlier single-class
+   `.signout` lost to `.btn.ghost` and rendered dark brown text on the dark brown
+   topbar - invisible. */
+.btn.signout {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  padding: 7px 14px;
+  font-weight: 500;
+}
+.btn.signout:hover { background: rgba(255, 255, 255, 0.14); border-color: #fff; }
+.btn.signout:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .scope-note { font-size: 10px; color: var(--gold); margin-top: 3px; }

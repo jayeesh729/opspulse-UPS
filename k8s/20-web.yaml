@@ -28,7 +28,7 @@ spec:
         runAsUser: 101
       containers:
         - name: web
-          image: opspulse-web:v6
+          image: opspulse-web:v7
           imagePullPolicy: IfNotPresent
           env:
             # nginx's resolver does raw DNS lookups and does NOT apply the
