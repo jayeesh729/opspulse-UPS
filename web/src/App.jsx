@@ -98,7 +98,7 @@ export default function App() {
           <div className="who-name">{user.name}</div>
           <div className="who-role">{roleLabel}</div>
         </div>
-        <button className="btn ghost signout" onClick={signOut}>Sign out</button>
+        <button className="btn signout" onClick={signOut}>Sign out</button>
       </header>
 
       <nav className="tabs">
