@@ -48,7 +48,7 @@ export default function App() {
       <header className="topbar">
         <div>
           <div className="brand">Ops<span>Pulse</span></div>
-          <div className="tagline">Logistics Operations Excellence · UPS 2026 GH-GHS-01</div>
+          <div className="tagline">Logistics Operations Excellence</div>
         </div>
         <div className="spacer" />
         <div>
