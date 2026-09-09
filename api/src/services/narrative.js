@@ -7,7 +7,12 @@
 //   - the response is length-capped and type-checked before it leaves the server
 //   - 3-second timeout with a deterministic templated fallback, so a slow or
 //     rate-limited model can never stall the demo
-//   - results are cached per site/scenario, so a repeated demo run costs nothing
+//   - results are cached per site/scenario, so a repeated demo run costs nothing.
+//     NOTE: this is an in-process Map, so it only hits when there is a single
+//     instance. Behind the 2-replica Kubernetes Deployment a repeat request may
+//     land on the other pod and miss. That is the correct trade-off for a demo -
+//     production would put this in Redis - and it is the one piece of state in an
+//     otherwise stateless API, which is what makes horizontal scaling safe.
 
 const cache = new Map();
 const TIMEOUT_MS = 3000;
@@ -73,7 +78,12 @@ export async function explainPlan({ site, scenario, kpis, plan, optimisation }) 
       body: JSON.stringify({
         model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
         temperature: 0.2,
-        max_tokens: 260,
+        // gpt-oss is a reasoning model and spends reasoning tokens from the SAME
+        // max_tokens budget. At 260 the reasoning consumed the whole allowance and
+        // `content` came back empty with finish_reason "length". Give it room, and
+        // ask for minimal reasoning since this is a formatting task, not a puzzle.
+        max_tokens: 900,
+        reasoning_effort: 'low',
         messages: [
           {
             role: 'system',
@@ -91,9 +101,13 @@ export async function explainPlan({ site, scenario, kpis, plan, optimisation }) 
 
     if (!r.ok) throw new Error(`Groq returned ${r.status}`);
     const json = await r.json();
-    const text = json?.choices?.[0]?.message?.content;
+    const choice = json?.choices?.[0];
+    const text = choice?.message?.content;
 
-    if (typeof text !== 'string' || text.trim().length < 20) throw new Error('Unusable model response');
+    // Validate the model's output before trusting it: a truncated or empty reply
+    // falls back to the deterministic template rather than reaching the UI.
+    if (choice?.finish_reason === 'length') throw new Error('model output truncated');
+    if (typeof text !== 'string' || text.trim().length < 20) throw new Error('unusable model response');
 
     const result = { narrative: text.trim().slice(0, MAX_CHARS), source: 'groq' };
     cache.set(key, result);

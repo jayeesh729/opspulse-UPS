@@ -113,8 +113,11 @@ POST /api/admin/reset-demo                         # admin role only
 
 ## Honest limits
 
-Single-node Kubernetes cluster; production would use a managed control plane, an Ingress with
-TLS, HPA, and a real secret store. Data is synthetic. Forecasting uses seasonal decomposition
+The AI briefing cache is an in-process `Map`, so it hits with a single instance but misses
+across the two Kubernetes replicas. Production would move it to Redis; it is deliberately the
+only piece of state in an otherwise stateless API, which is what makes the replicas safe to
+scale. Single-node Kubernetes cluster; production would use a managed control plane, an Ingress
+with TLS, HPA, and a real secret store. Data is synthetic. Forecasting uses seasonal decomposition
 with Holt's linear trend rather than a trained model - **120 days of history does not justify
 one**, and an unexplainable model is worse than a slightly less accurate explainable one when
 a manager has to defend a staffing decision.

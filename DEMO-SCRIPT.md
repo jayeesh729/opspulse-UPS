@@ -205,6 +205,8 @@ Then the line that matters most:
 
 Single-node Kubernetes cluster; production wants a managed control plane, Ingress with TLS, HPA and
 a real secret store. Data is synthetic. Fixed intraday shift split rather than a real curve.
-Volume-weighted OEI hides variance within a function.
+Volume-weighted OEI hides variance within a function. The AI briefing cache is in-process, so it
+misses across the two replicas — deliberately the only state in an otherwise stateless API, and
+Redis in production.
 
 **Naming your own limits reads as engineering judgement. Being caught not knowing them doesn't.**
