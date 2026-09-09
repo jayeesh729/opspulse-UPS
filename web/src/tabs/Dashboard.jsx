@@ -5,7 +5,7 @@ import { api } from '../api.js';
 const pct = (x) => `${Math.round((x ?? 0) * 100)}%`;
 const band = (v) => (v >= 90 ? 'good' : v >= 80 ? 'warn' : 'bad');
 
-export default function Dashboard({ data, site, scenario, role }) {
+export default function Dashboard({ data, site, scenario }) {
   const { kpis, alerts, summary, optimisation } = data;
   const [narrative, setNarrative] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -13,7 +13,7 @@ export default function Dashboard({ data, site, scenario, role }) {
   async function explain() {
     setBusy(true);
     try {
-      setNarrative(await api.explain(site, scenario, role));
+      setNarrative(await api.explain(site, scenario));
     } catch (e) {
       setNarrative({ narrative: `Could not generate briefing: ${e.message}`, source: 'error' });
     } finally {

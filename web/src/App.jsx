@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { api } from './api.js';
+import { api, session } from './api.js';
+import Login from './Login.jsx';
 import Dashboard from './tabs/Dashboard.jsx';
 import Forecast from './tabs/Forecast.jsx';
 import WorkforcePlan from './tabs/WorkforcePlan.jsx';
@@ -13,35 +14,68 @@ const TABS = [
 ];
 
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [booting, setBooting] = useState(true);
   const [meta, setMeta] = useState(null);
-  const [role, setRole] = useState('manager');
-  const [site, setSite] = useState('MAA');
+  const [site, setSite] = useState(null);
   const [scenario, setScenario] = useState(1);
   const [tab, setTab] = useState('dashboard');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  // Restore an existing session on reload rather than forcing a second sign-in.
+  useEffect(() => {
+    if (!session.token) return setBooting(false);
+    api.me()
+      .then((r) => setUser(r.user))
+      .catch(() => session.clear())
+      .finally(() => setBooting(false));
+  }, []);
+
+  // The API client raises this when a token is rejected, so an expired session
+  // returns to the login screen instead of showing broken panels.
+  useEffect(() => {
+    const signOut = () => { setUser(null); setData(null); setMeta(null); setSite(null); };
+    window.addEventListener('opspulse:signed-out', signOut);
+    return () => window.removeEventListener('opspulse:signed-out', signOut);
+  }, []);
 
   useEffect(() => {
-    api.meta(role).then(setMeta).catch((e) => setError(e.message));
-  }, [role]);
+    if (!user) return;
+    api.meta().then(setMeta).catch((e) => setError(e.message));
+    setSite(user.sites?.[0]?.code ?? null);
+  }, [user]);
 
   const load = useCallback(async () => {
+    if (!site) return;
     setLoading(true);
     try {
-      setData(await api.overview(site, scenario, role));
+      setData(await api.overview(site, scenario));
       setError(null);
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [site, scenario, role]);
+  }, [site, scenario]);
 
   useEffect(() => { load(); }, [load]);
 
-  const sites = meta?.sites ?? [];
+  function signOut() {
+    session.clear();
+    setUser(null);
+    setData(null);
+    setMeta(null);
+    setSite(null);
+  }
+
+  if (booting) return <div className="state">Restoring session…</div>;
+  if (!user) return <Login onSuccess={setUser} />;
+
+  const sites = user.sites ?? [];
   const scenarios = meta?.scenarios ?? [];
+  const roleLabel = meta?.currentRole?.label ?? user.role;
 
   return (
     <>
@@ -51,18 +85,20 @@ export default function App() {
           <div className="tagline">Logistics Operations Excellence</div>
         </div>
         <div className="spacer" />
+
         <div>
           <label htmlFor="site">Site</label>
-          <select id="site" value={site} onChange={(e) => setSite(e.target.value)}>
+          <select id="site" value={site ?? ''} onChange={(e) => setSite(e.target.value)}>
             {sites.map((s) => <option key={s.code} value={s.code}>{s.code} — {s.name}</option>)}
           </select>
+          {sites.length === 1 && <div className="scope-note">Scoped to your hub</div>}
         </div>
-        <div>
-          <label htmlFor="role">View as</label>
-          <select id="role" value={role} onChange={(e) => setRole(e.target.value)}>
-            {(meta?.roles ?? []).map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
-          </select>
+
+        <div className="whoami">
+          <div className="who-name">{user.name}</div>
+          <div className="who-role">{roleLabel}</div>
         </div>
+        <button className="btn ghost signout" onClick={signOut}>Sign out</button>
       </header>
 
       <nav className="tabs">
@@ -104,13 +140,12 @@ export default function App() {
 
         {data && (
           <>
-            {tab === 'dashboard' && <Dashboard data={data} site={site} scenario={scenario} role={role} />}
-            {tab === 'forecast' && <Forecast site={site} role={role} functions={meta?.functions ?? []} />}
+            {tab === 'dashboard' && <Dashboard data={data} site={site} scenario={scenario} />}
+            {tab === 'forecast' && <Forecast site={site} functions={meta?.functions ?? []} />}
             {tab === 'workforce' && <WorkforcePlan data={data} />}
             {tab === 'optimize' && <Optimization data={data} />}
           </>
         )}
-
       </main>
 
       <footer className="site-footer">
@@ -129,15 +164,16 @@ export default function App() {
           </div>
 
           <div className="footer-col">
-            <h3>Scope &amp; data</h3>
+            <h3>Access &amp; scope</h3>
             <p>
-              Demonstration build running on a synthetic dataset generated for evaluation purposes.
-              Figures do not represent actual UPS operations.
+              Access is controlled by role and enforced on the server. Your account is signed in as{' '}
+              <strong>{roleLabel}</strong> with access to{' '}
+              <strong>{sites.length === 1 ? sites[0].name : `all ${sites.length} hubs`}</strong>.
             </p>
             <p>
-              Forecasts are statistical estimates with a stated confidence interval and a published
-              error rate. Recommendations are advisory; rostering decisions remain with the
-              operations manager.
+              Demonstration build on a synthetic dataset. Forecasts are statistical estimates with a
+              stated confidence interval; recommendations are advisory and rostering decisions remain
+              with the operations manager.
             </p>
           </div>
         </div>

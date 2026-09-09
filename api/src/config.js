@@ -53,5 +53,21 @@ export const ROLES = {
   admin: { label: 'Admin', canWrite: true, allSites: true, canReset: true },
 };
 
+// Demo accounts. Passwords are hashed with scrypt at seed time and never stored in
+// plain text; the shared demo password is listed on the login screen deliberately so
+// a judge can sign in as each role and see the access boundary for themselves.
+//
+// `sites: null` means every site. A manager is scoped to their own hub, which is the
+// access rule that actually matters here: one hub's staffing position is not another
+// hub manager's business.
+export const DEMO_PASSWORD = 'opspulse2026';
+
+export const DEMO_USERS = [
+  { username: 'maya', displayName: 'Maya R.', role: 'manager', sites: ['MAA'] },
+  { username: 'priya', displayName: 'Priya S.', role: 'planner', sites: null },
+  { username: 'leo', displayName: 'Leo M.', role: 'leader', sites: null },
+  { username: 'admin', displayName: 'System Admin', role: 'admin', sites: null },
+];
+
 export const SEED = 20260909;
 export const HISTORY_DAYS = 120;

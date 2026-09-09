@@ -16,7 +16,7 @@ set +x                      # belt and braces: never trace-log the values below
 
 NS="opspulse"
 SECRET="app-secrets"
-KEYS=(MONGODB_URI GROQ_API_KEY GROQ_MODEL)
+KEYS=(MONGODB_URI GROQ_API_KEY GROQ_MODEL JWT_SECRET)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/../api/.env}"
