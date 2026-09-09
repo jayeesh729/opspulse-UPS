@@ -5,3 +5,6 @@ dist/
 !.env.example
 *.log
 .DS_Store
+
+# Local-only: demo coaching notes, deliberately not published
+DEMO-SCRIPT.md
