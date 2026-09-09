@@ -6,6 +6,7 @@ import { SITES } from '../config.js';
 import { verifyPassword, signToken } from '../services/auth.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
+import { wrap } from '../middleware/async.js';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ const loginSchema = z.object({
   password: z.string().min(6, 'must be at least 6 characters').max(128),
 });
 
-router.post('/login', loginLimiter, validate(loginSchema, 'body'), async (req, res) => {
+router.post('/login', loginLimiter, validate(loginSchema, 'body'), wrap(async (req, res) => {
   const { username, password } = req.validated;
   const user = await User.findOne({ username }).lean();
 
@@ -41,7 +42,7 @@ router.post('/login', loginLimiter, validate(loginSchema, 'body'), async (req, r
     token: signToken(user),
     user: { username: user.username, name: user.displayName, role: user.role, sites: scoped },
   });
-});
+}));
 
 /** Lets the frontend restore a session on reload without a second login. */
 router.get('/me', requireAuth, (req, res) => {
