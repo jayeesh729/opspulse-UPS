@@ -1,0 +1,51 @@
+# OpsPulse - one-command local stack.
+#   docker compose up -d   ->  UI on http://localhost:3000, API on http://localhost:8001
+#
+# No mongo service here on purpose: the app talks to MongoDB Atlas in the cloud, and
+# the connection string arrives from api/.env (gitignored, never baked into an image).
+# Host ports are deliberately 8001 and 3000 - 8000 and 5173 belong to the dev servers.
+
+name: opspulse
+
+services:
+  api:
+    build:
+      context: ./api
+    image: opspulse-api:local
+    # Secrets (MONGODB_URI, GROQ_API_KEY) are read at runtime from this gitignored
+    # file. Nothing sensitive is inlined here or committed to the image.
+    env_file:
+      - ./api/.env
+    environment:
+      # Bind port inside the container, independent of whatever .env happens to say.
+      PORT: 8000
+    ports:
+      - "8001:8000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  web:
+    build:
+      context: ./web
+    image: opspulse-web:local
+    ports:
+      - "3000:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s

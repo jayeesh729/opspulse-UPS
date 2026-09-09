@@ -9,7 +9,8 @@
 // fit because volume ramps into peak season - a linear fit lags a ramp badly, which
 // is exactly when the forecast matters most.
 
-const iso = (d) => d.toISOString().slice(0, 10);
+import { isoDate as iso } from '../util/date.js';
+
 const dow = (d) => new Date(d).getDay();
 
 function weekdayIndex(rows) {

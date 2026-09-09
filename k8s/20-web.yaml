@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: opspulse
+  labels:
+    app: web
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: opspulse
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+        app.kubernetes.io/name: web
+        app.kubernetes.io/part-of: opspulse
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        # Verified: nginxinc/nginx-unprivileged runs as UID 101, so unlike stock
+        # nginx this pod can be pinned non-root without breaking /var/cache/nginx.
+        runAsNonRoot: true
+        runAsUser: 101
+      containers:
+        - name: web
+          image: opspulse-web:v2
+          imagePullPolicy: IfNotPresent
+          env:
+            # nginx's resolver does raw DNS lookups and does NOT apply the
+            # search-domain list, so the bare service name that works under
+            # docker compose must be a full FQDN inside the cluster.
+            - name: API_UPSTREAM
+              value: http://api.opspulse.svc.cluster.local:8000
+          ports:
+            - name: http
+              containerPort: 8080
+          # Static SPA -- nothing to configure, so no envFrom and no secret here.
+          # The browser never talks to the api Service directly: nginx proxies
+          # /api to http://api:8000 inside the cluster.
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # NOTE: deliberately no runAsNonRoot here -- see k8s/README.md.
+          # Stock nginx starts its master process as root and writes to
+          # /var/cache/nginx and /var/run, so forcing a non-root UID breaks it
+          # unless the image is built on nginx-unprivileged. These two settings
+          # are safe for either image; port 8080 is >1024 so no NET_BIND_SERVICE.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: opspulse
+  labels:
+    app: web
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: opspulse
+spec:
+  # NodePort so a browser on the host can reach the SPA at http://localhost:30080
+  # without kubectl port-forward. An Ingress + TLS would be the production answer.
+  type: NodePort
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080
+      protocol: TCP

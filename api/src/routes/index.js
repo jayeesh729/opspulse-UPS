@@ -6,6 +6,7 @@ import { buildForecast, backtest, detectAnomalies } from '../engine/forecast.js'
 import { computeKpis, buildAlerts } from '../engine/kpis.js';
 import { buildWorkforcePlan, planSummary } from '../engine/workforce.js';
 import { optimise } from '../engine/optimize.js';
+import { isoDate } from '../util/date.js';
 import { validate } from '../middleware/validate.js';
 import { roleContext, requireReset } from '../middleware/role.js';
 import { seedDatabase } from '../data/seed.js';
@@ -94,7 +95,7 @@ router.get('/forecast', validate(forecastQuery), async (req, res) => {
   res.json({
     site,
     functionType: fn,
-    history: series.slice(-45).map((r) => ({ date: new Date(r.date).toISOString().slice(0, 10), units: r.units })),
+    history: series.slice(-45).map((r) => ({ date: isoDate(r.date), units: r.units })),
     forecast: buildForecast(series, horizon),
     accuracy: backtest(series),
     anomalies: detectAnomalies(series),

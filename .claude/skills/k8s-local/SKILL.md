@@ -118,8 +118,14 @@ kubectl -n hack delete pod <one-api-pod>
 kubectl -n hack get pods         # replacement already starting
 ```
 
-Narrate: *"Two replicas behind one service. I kill a pod — Kubernetes notices through the liveness
-probe and reschedules it, and the app stayed up because the second replica served traffic."*
+Narrate: *"Two replicas behind one service. I delete a pod — the ReplicaSet controller sees actual
+replicas drop below desired and schedules a replacement, and the app stayed up because the second
+replica kept serving."*
+
+**Get the mechanism right.** It is the ReplicaSet controller reconciling desired vs actual state,
+**not** the liveness probe. The liveness probe restarts a container that is wedged but still
+running; it plays no part in replacing a deleted pod. Saying "the liveness probe rescheduled it" is
+wrong and a technical judge may catch it.
 
 Ten seconds, and it is the most convincing thing a beginner can show a technical judge.
 

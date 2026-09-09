@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: opspulse
+  labels:
+    app: api
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: opspulse
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+        app.kubernetes.io/name: api
+        app.kubernetes.io/part-of: opspulse
+    spec:
+      # Pod-level security: refuse to start the container as root.
+      # runAsUser is set explicitly because runAsNonRoot alone cannot be enforced
+      # when the image declares a NAMED user (e.g. `USER node`) instead of a UID --
+      # the kubelet fails with "cannot verify user is non-root". 1000 is the `node`
+      # user in the official node images.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: opspulse-api:v2
+          # Image is built locally and never pushed to a registry, so the kubelet
+          # must not try to pull it. Requires an explicit tag -- never :latest.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            # Pinned so the listen port can never drift from containerPort,
+            # regardless of what PORT happens to be in a local .env file.
+            - name: PORT
+              value: "8000"
+          envFrom:
+            # MONGODB_URI, GROQ_API_KEY, GROQ_MODEL -- created by ./secret.sh.
+            # Values are injected at runtime, never baked into the image or this file.
+            - secretRef:
+                name: app-secrets
+          # Readiness gates traffic; liveness restarts a wedged process.
+          # Both hit /api/health, which is mounted ahead of the rate limiter so
+          # Kubernetes can never throttle itself out of a healthy pod.
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  # MUST be exactly "api": the web nginx config proxies /api to http://api:8000,
+  # which resolves through this Service's cluster DNS name.
+  name: api
+  namespace: opspulse
+  labels:
+    app: api
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: opspulse
+spec:
+  type: ClusterIP
+  selector:
+    app: api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
