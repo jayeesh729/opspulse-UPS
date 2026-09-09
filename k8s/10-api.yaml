@@ -33,7 +33,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: api
-          image: opspulse-api:v2
+          image: opspulse-api:v4
           # Image is built locally and never pushed to a registry, so the kubelet
           # must not try to pull it. Requires an explicit tag -- never :latest.
           imagePullPolicy: IfNotPresent

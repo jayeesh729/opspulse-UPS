@@ -1,8 +1,9 @@
 import '../env.js';
 import mongoose from 'mongoose';
 import { connectDb } from '../db.js';
-import { Site, Standard, Operation, Workforce } from '../models/index.js';
-import { SITES } from '../config.js';
+import { Site, Standard, Operation, Workforce, User } from '../models/index.js';
+import { SITES, DEMO_USERS, DEMO_PASSWORD } from '../config.js';
+import { hashPassword } from '../services/auth.js';
 import { generateOperations, generateStandards, generateWorkforce } from './generate.js';
 
 /**
@@ -26,7 +27,20 @@ export async function seedDatabase() {
     Standard.deleteMany({}),
     Operation.deleteMany({}),
     Workforce.deleteMany({}),
+    User.deleteMany({}),
   ]);
+
+  // Accounts are rebuilt with freshly salted hashes each seed - the plain-text demo
+  // password exists only here and in the login screen hint, never in the database.
+  await User.insertMany(
+    DEMO_USERS.map((u) => ({
+      username: u.username,
+      displayName: u.displayName,
+      role: u.role,
+      sites: u.sites ?? [],
+      passwordHash: hashPassword(DEMO_PASSWORD),
+    }))
+  );
 
   await Site.insertMany(SITES);
   await Standard.insertMany(standards);
@@ -39,6 +53,7 @@ export async function seedDatabase() {
   }
 
   return {
+    users: DEMO_USERS.length,
     sites: SITES.length,
     standards: standards.length,
     workforce: workforce.length,

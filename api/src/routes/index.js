@@ -8,12 +8,14 @@ import { buildWorkforcePlan, planSummary } from '../engine/workforce.js';
 import { optimise } from '../engine/optimize.js';
 import { isoDate } from '../util/date.js';
 import { validate } from '../middleware/validate.js';
-import { roleContext, requireReset } from '../middleware/role.js';
+import { requireAuth, requireSiteAccess, requireReset } from '../middleware/auth.js';
 import { seedDatabase } from '../data/seed.js';
 import { explainPlan } from '../services/narrative.js';
 
 const router = Router();
-router.use(roleContext);
+
+// Everything below this line requires a valid signed token.
+router.use(requireAuth);
 
 const siteCode = z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, 'must be a 3-letter site code');
 const fnType = z.enum(FUNCTIONS);
@@ -64,30 +66,33 @@ router.get('/health', (req, res) => res.json({ status: 'ok', service: 'opspulse-
 
 router.get('/meta', (req, res) =>
   res.json({
-    sites: SITES,
     functions: FUNCTIONS,
     shifts: SHIFTS,
     scenarios: SCENARIOS,
     roles: Object.entries(ROLES).map(([key, v]) => ({ key, ...v })),
     oeiWeights: OEI_WEIGHTS,
-    currentRole: { key: req.role, ...req.perms },
+    sites: (req.user.sites ?? []).length ? SITES.filter((s) => req.user.sites.includes(s.code)) : SITES,
+    currentUser: { username: req.user.sub, name: req.user.name, role: req.user.role },
+    currentRole: { key: req.user.role, ...req.perms },
     privacyNote: 'All metrics are aggregated at site, function and shift level. No individual employee data is collected or stored.',
   })
 );
 
 router.get('/sites', async (req, res) => {
-  const sites = await Site.find({}).sort({ code: 1 }).lean();
+  const scope = req.user.sites ?? [];
+  const filter = scope.length ? { code: { $in: scope } } : {};
+  const sites = await Site.find(filter).sort({ code: 1 }).lean();
   res.json(sites.map(({ code, name, region }) => ({ code, name, region })));
 });
 
-router.get('/kpis', validate(siteQuery), async (req, res) => {
+router.get('/kpis', validate(siteQuery), requireSiteAccess, async (req, res) => {
   const { site, days } = req.validated;
   const { ops, standardsByFunction } = await loadSite(site, days);
   if (!ops.length) return res.status(404).json({ error: 'No data', detail: `No operations found for site ${site}` });
   res.json(computeKpis(ops, standardsByFunction));
 });
 
-router.get('/forecast', validate(forecastQuery), async (req, res) => {
+router.get('/forecast', validate(forecastQuery), requireSiteAccess, async (req, res) => {
   const { site, function: fn, horizon } = req.validated;
   const series = await Operation.find({ siteCode: site, functionType: fn }).sort({ date: 1 }).lean();
   if (!series.length) return res.status(404).json({ error: 'No data', detail: `No history for ${site}/${fn}` });
@@ -102,7 +107,7 @@ router.get('/forecast', validate(forecastQuery), async (req, res) => {
   });
 });
 
-router.get('/workforce-plan', validate(planQuery), async (req, res) => {
+router.get('/workforce-plan', validate(planQuery), requireSiteAccess, async (req, res) => {
   const { site, scenario } = req.validated;
   const [{ standardsByFunction, workforce }, forecastByFunction] = await Promise.all([
     loadSite(site, 30),
@@ -112,7 +117,7 @@ router.get('/workforce-plan', validate(planQuery), async (req, res) => {
   res.json({ site, scenario, plan, summary: planSummary(plan) });
 });
 
-router.get('/optimize', validate(planQuery), async (req, res) => {
+router.get('/optimize', validate(planQuery), requireSiteAccess, async (req, res) => {
   const { site, scenario } = req.validated;
   const [{ standardsByFunction, workforce }, forecastByFunction] = await Promise.all([
     loadSite(site, 30),
@@ -123,7 +128,7 @@ router.get('/optimize', validate(planQuery), async (req, res) => {
 });
 
 /** One call powering the whole dashboard - fewer round trips, faster demo. */
-router.get('/overview', validate(planQuery), async (req, res) => {
+router.get('/overview', validate(planQuery), requireSiteAccess, async (req, res) => {
   const { site, scenario, days } = req.validated;
   const [{ ops, standardsByFunction, workforce }, forecastByFunction] = await Promise.all([
     loadSite(site, days),
@@ -160,6 +165,10 @@ router.post('/explain', async (req, res) => {
     });
   }
   const { site, scenario } = parsed.data;
+  const scope = req.user.sites ?? [];
+  if (scope.length && !scope.includes(site)) {
+    return res.status(403).json({ error: 'Forbidden', detail: `Your account has access to ${scope.join(', ')} only.` });
+  }
   const [{ ops, standardsByFunction, workforce }, forecastByFunction] = await Promise.all([
     loadSite(site, 30),
     nextDayForecast(site),

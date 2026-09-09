@@ -9,6 +9,7 @@ import rateLimit from 'express-rate-limit';
 import mongoSanitize from 'express-mongo-sanitize';
 import { connectDb, dbState } from './db.js';
 import api from './routes/index.js';
+import authRoutes from './routes/auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -19,7 +20,7 @@ app.use(helmet());                                   // security headers
 app.use(
   cors({
     origin: process.env.WEB_ORIGIN ? process.env.WEB_ORIGIN.split(',') : true,
-    allowedHeaders: ['Content-Type', 'X-Role'],      // explicit origin, never a bare wildcard in prod
+    allowedHeaders: ['Content-Type', 'Authorization'], // explicit origin, never a bare wildcard in prod
   })
 );
 app.use(express.json({ limit: '100kb' }));           // payload cap
@@ -32,6 +33,9 @@ app.get('/api/health', (req, res) =>
 );
 
 app.use(rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false }));
+
+// Sign-in is public; everything under /api requires a token.
+app.use('/api/auth', authRoutes);
 app.use('/api', api);
 
 // --- Single-service mode (cloud deploy) ----------------------------------------

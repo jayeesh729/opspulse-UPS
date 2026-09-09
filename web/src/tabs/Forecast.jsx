@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { api } from '../api.js';
 
-export default function Forecast({ site, role, functions }) {
+export default function Forecast({ site, functions }) {
   const [fn, setFn] = useState('outbound');
   const [horizon, setHorizon] = useState(14);
   const [d, setD] = useState(null);
@@ -12,11 +12,11 @@ export default function Forecast({ site, role, functions }) {
 
   useEffect(() => {
     let live = true;
-    api.forecast(site, fn, horizon, role)
+    api.forecast(site, fn, horizon)
       .then((r) => live && (setD(r), setErr(null)))
       .catch((e) => live && setErr(e.message));
     return () => { live = false; };
-  }, [site, fn, horizon, role]);
+  }, [site, fn, horizon]);
 
   if (err) return <div className="state err">Error: {err}</div>;
   if (!d) return <div className="state">Loading forecast…</div>;

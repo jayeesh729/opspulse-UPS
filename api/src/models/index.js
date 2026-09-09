@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { FUNCTIONS } from '../config.js';
+import { FUNCTIONS, ROLES } from '../config.js';
 
 // Layer 2 of validation: even if a route handler has a bug, the database
 // itself refuses malformed documents. Zod guards the edge, this guards the data.
@@ -44,6 +44,20 @@ const workforceSchema = new mongoose.Schema({
 });
 workforceSchema.index({ siteCode: 1, functionType: 1, shift: 1 }, { unique: true });
 
+// Accounts. Only a salted scrypt hash is stored - never a password.
+// `sites` empty means every site; otherwise the account is scoped to those hubs.
+const userSchema = new mongoose.Schema(
+  {
+    username: { type: String, required: true, unique: true, lowercase: true, trim: true, minlength: 3, maxlength: 32 },
+    displayName: { type: String, required: true, maxlength: 60 },
+    passwordHash: { type: String, required: true },
+    role: { type: String, required: true, enum: Object.keys(ROLES) },
+    sites: { type: [String], default: [] },
+  },
+  { timestamps: true }
+);
+
+export const User = mongoose.model('User', userSchema);
 export const Site = mongoose.model('Site', siteSchema);
 export const Standard = mongoose.model('Standard', standardSchema);
 export const Operation = mongoose.model('Operation', operationSchema);
