@@ -120,4 +120,4 @@ scale. Single-node Kubernetes cluster; production would use a managed control pl
 with TLS, HPA, and a real secret store. Data is synthetic. Forecasting uses seasonal decomposition
 with Holt's linear trend rather than a trained model - **120 days of history does not justify
 one**, and an unexplainable model is worse than a slightly less accurate explainable one when
-a manager has to defend a staffing decision.
+a manager has to defend a staffing choices.
