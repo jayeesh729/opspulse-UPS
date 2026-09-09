@@ -1,4 +1,5 @@
 import { OEI_WEIGHTS, SHIFTS } from '../config.js';
+import { isoDate } from '../util/date.js';
 
 // The Operational Efficiency Index.
 //
@@ -11,7 +12,7 @@ const SHIFT_HOURS = SHIFTS[0].hours;
 
 export function metricsFor(rows, standard) {
   if (!rows.length) {
-    return { units: 0, throughput: 0, efficiencyRatio: 0, utilisation: 0, onTime: 0, cycleTimeMin: 0, oei: 0, headcount: 0 };
+    return { units: 0, labourHours: 0, throughput: 0, efficiencyRatio: 0, utilisation: 0, onTime: 0, cycleTimeMin: 0, oei: 0, headcount: 0 };
   }
 
   const units = rows.reduce((a, r) => a + r.units, 0);
@@ -63,7 +64,7 @@ export function computeKpis(rows, standardsByFunction) {
 
   const byDate = new Map();
   for (const r of rows) {
-    const key = new Date(r.date).toISOString().slice(0, 10);
+    const key = isoDate(r.date);
     if (!byDate.has(key)) byDate.set(key, []);
     byDate.get(key).push(r);
   }
