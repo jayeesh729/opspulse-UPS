@@ -1,0 +1,159 @@
+================================================================================
+OpsPulse - Requirements
+Logistics Operations Excellence through Predictive Analytics and Resource
+Optimization  |  UPS Use Case 2026 GH-GHS-01
+================================================================================
+
+Note: this project is Node.js, so the authoritative, machine-readable dependency
+lists are api/package.json and web/package.json (npm installs from those, and the
+exact resolved versions are pinned in the package-lock.json files). This file is
+the human-readable manifest: what must be installed, which accounts are needed,
+and which environment variables must be set before the app will run.
+
+
+--------------------------------------------------------------------------------
+1. SYSTEM PREREQUISITES
+--------------------------------------------------------------------------------
+
+REQUIRED
+  Node.js            >= 20.0.0        (verified on v24.8.0)
+  npm                >= 10.0.0        (verified on v11.6.0)
+  Git                any recent version
+
+REQUIRED FOR THE CONTAINERISED / ORCHESTRATED DEPLOYMENT
+  Docker Engine      >= 24.0          (verified on 29.7.2)
+  Docker Compose     v2 (bundled with Docker Desktop)
+  kubectl            >= 1.28          (verified on v1.36.1)
+  Kubernetes         a single-node cluster is sufficient
+                     (Docker Desktop's built-in cluster was used)
+
+PLATFORM NOTES
+  Windows            Docker Desktop requires WSL 2. Windows Home cannot use the
+                     Hyper-V backend, so WSL 2 is mandatory there.
+  Disk               Keep Docker's disk image on an SSD. Kubernetes runs etcd,
+                     which is write-latency sensitive; kubeadm fails to
+                     initialise on a mechanical drive.
+
+
+--------------------------------------------------------------------------------
+2. EXTERNAL SERVICES  (both have free tiers, no card required)
+--------------------------------------------------------------------------------
+
+  MongoDB Atlas      M0 free cluster. The application's data tier - it does not
+                     run a local database. Network access must permit the host
+                     running the API.
+                     https://www.mongodb.com/atlas
+
+  Groq API           Powers the AI shift briefing only. OPTIONAL: without a key
+                     the briefing falls back to a deterministic templated summary
+                     and every other feature is unaffected.
+                     https://console.groq.com
+
+
+--------------------------------------------------------------------------------
+3. ENVIRONMENT VARIABLES        (api/.env - see api/.env.example)
+--------------------------------------------------------------------------------
+
+REQUIRED
+  MONGODB_URI        MongoDB Atlas connection string, including the database
+                     name. Example shape:
+                     mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net/ups_hack
+
+  JWT_SECRET         Signing key for session tokens. Generate with:
+                     node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+                     If unset the server falls back to a development key and
+                     logs a warning. Never rely on that outside local use.
+
+OPTIONAL
+  GROQ_API_KEY       Enables the AI shift briefing.
+  GROQ_MODEL         Defaults to openai/gpt-oss-120b
+  PORT               Defaults to 8000
+  WEB_ORIGIN         Comma-separated CORS allow-list. Defaults to permissive for
+                     local development; set it explicitly in production.
+
+  NEVER commit api/.env - it is gitignored. api/.env.example is the template.
+
+
+--------------------------------------------------------------------------------
+4. RUNTIME DEPENDENCIES        (installed by npm - do not install by hand)
+--------------------------------------------------------------------------------
+
+API  (api/package.json)
+  express                  ^4.21.2    HTTP server
+  mongoose                 ^8.9.5     MongoDB ODM + schema-level validation
+  zod                      ^3.24.1    request validation at the API edge
+  jsonwebtoken             ^9.0.3     signed session tokens
+  helmet                   ^8.0.0     security headers
+  cors                     ^2.8.5     explicit cross-origin policy
+  express-rate-limit       ^7.5.0     abuse and brute-force protection
+  express-mongo-sanitize   ^2.2.0     NoSQL injection prevention
+  dotenv                   ^16.4.7    environment file loading
+
+  Password hashing uses scrypt from Node's built-in crypto module - no native
+  build step and no additional dependency.
+
+WEB  (web/package.json)
+  react                    ^18.3.1
+  react-dom                ^18.3.1
+  recharts                 ^2.15.0    charting
+  vite                     ^6.0.7     build tool          (dev dependency)
+  @vitejs/plugin-react     ^4.3.4                          (dev dependency)
+
+TESTS
+  None. The suite uses Node's built-in test runner (node:test), so there is no
+  test framework to install.
+
+
+--------------------------------------------------------------------------------
+5. INSTALL AND RUN
+--------------------------------------------------------------------------------
+
+  # 1. dependencies
+  cd api && npm install
+  cd ../web && npm install
+
+  # 2. configure
+  cp api/.env.example api/.env        # then fill in MONGODB_URI and JWT_SECRET
+
+  # 3. populate the database (deterministic - safe to re-run)
+  cd api && npm run seed
+
+  # 4a. run in development (two terminals, hot reload)
+  cd api && npm run dev               # http://localhost:8000
+  cd web && npm run dev               # http://localhost:5173
+
+  # 4b. or run containerised (single command)
+  docker compose up -d                # http://localhost:3000
+
+  # 4c. or run on Kubernetes
+  kubectl apply -f k8s/00-namespace.yaml
+  ./k8s/secret.sh                     # creates app-secrets from api/.env
+  kubectl apply -f k8s/
+  kubectl -n opspulse port-forward svc/web 30080:8080
+
+
+--------------------------------------------------------------------------------
+6. DEMO ACCOUNTS        (created by the seed; password shown on the login screen)
+--------------------------------------------------------------------------------
+
+  username   password        role                  site access
+  --------   -------------   -------------------   -----------------------
+  maya       opspulse2026    Ops Manager           MAA (Chennai) only
+  priya      opspulse2026    Workforce Planner      all hubs, can edit
+  leo        opspulse2026    Operations Leader      all hubs, read-only
+  admin      opspulse2026    Admin                  all hubs, plus data reset
+
+  Passwords are stored only as salted scrypt hashes. Site scoping is enforced
+  server-side on every request, not in the interface.
+
+
+--------------------------------------------------------------------------------
+7. VERIFY THE INSTALL
+--------------------------------------------------------------------------------
+
+  cd api && npm test                  # expect 98 passing
+  curl http://localhost:8000/api/health    # {"status":"ok", ...}
+  curl http://localhost:8000/api/ready     # {"ready":true,"db":"connected"}
+
+  Both probes should respond. /api/health reports process liveness;
+  /api/ready returns 503 until the database connection is established.
