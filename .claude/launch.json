@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "opspulse-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "web"],
+      "port": 5173
+    },
+    {
+      "name": "opspulse-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start", "--prefix", "api"],
+      "port": 8000
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:8000/api/health)",
+      "Bash(break)",
+      "Bash(curl -s \"http://localhost:8000/api/forecast?site=MAA&function=outbound&horizon=14\")",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const j=JSON.parse\\(s\\);if\\(j.error\\)return console.log\\(JSON.stringify\\(j\\)\\);console.log\\('history pts:',j.history.length,' forecast pts:',j.forecast.length\\);console.log\\('accuracy:',JSON.stringify\\(j.accuracy\\)\\);console.log\\('next 3:',JSON.stringify\\(j.forecast.slice\\(0,3\\)\\)\\);console.log\\('anomalies:',j.anomalies.length\\)}\\)\")",
+      "Bash(curl -s \"http://localhost:8000/api/overview?site=MAA&scenario=1\")",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const j=JSON.parse\\(s\\);if\\(j.error\\)return console.log\\(JSON.stringify\\(j\\)\\);console.log\\('OEI:',j.kpis.oei\\);console.log\\('byFunction:',Object.entries\\(j.kpis.byFunction\\).map\\(\\([k,v]\\)=>k+'='+v.oei+'\\(eff '+v.efficiencyRatio+', util '+v.utilisation+'\\)'\\).join\\(' | '\\)\\);console.log\\('summary:',JSON.stringify\\(j.summary\\)\\);console.log\\('moves:',j.optimisation.moves.length,'peopleMoved:',j.optimisation.peopleMoved,'hrs/wk:',j.optimisation.hoursReclaimedPerWeek,'residual:',j.optimisation.residualPeople\\);console.log\\('alerts:',j.alerts.length\\)}\\)\")"
+    ]
+  }
+}
