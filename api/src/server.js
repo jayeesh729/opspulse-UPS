@@ -1,4 +1,7 @@
 import './env.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -30,6 +33,23 @@ app.get('/api/health', (req, res) =>
 
 app.use(rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false }));
 app.use('/api', api);
+
+// --- Single-service mode (cloud deploy) ----------------------------------------
+// When a built frontend is present next to the API, serve it from the same origin.
+// That gives one public URL with no CORS between tiers, which is what we want on
+// Render. Locally the frontend runs on Vite and in Docker it is served by nginx,
+// so web/dist does not exist there and this block is simply skipped.
+const here = path.dirname(fileURLToPath(import.meta.url));
+const webDist = path.resolve(here, '../../web/dist');
+
+if (fs.existsSync(webDist)) {
+  console.log('serving built frontend from', webDist);
+  app.use(express.static(webDist));
+  // SPA fallback: any non-API path returns index.html so client-side routing works.
+  app.get('*', (req, res, next) =>
+    req.path.startsWith('/api') ? next() : res.sendFile(path.join(webDist, 'index.html'))
+  );
+}
 
 app.use((req, res) => res.status(404).json({ error: 'Not found', path: req.path }));
 
