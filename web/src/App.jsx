@@ -111,8 +111,42 @@ export default function App() {
           </>
         )}
 
-        {meta && <div className="privacy">🔒 {meta.privacyNote}</div>}
       </main>
+
+      <footer className="site-footer">
+        <div className="footer-inner">
+          <div className="footer-col">
+            <h3>Data &amp; privacy</h3>
+            <p>
+              {meta?.privacyNote ??
+                'All metrics are aggregated at site, function and shift level. No individual employee data is collected or stored.'}
+            </p>
+            <p>
+              OpsPulse measures <strong>processes and operational areas</strong>, never people. It is
+              not intended to measure or evaluate individual employee productivity, and the data model
+              contains no employee entity by design.
+            </p>
+          </div>
+
+          <div className="footer-col">
+            <h3>Scope &amp; data</h3>
+            <p>
+              Demonstration build running on a synthetic dataset generated for evaluation purposes.
+              Figures do not represent actual UPS operations.
+            </p>
+            <p>
+              Forecasts are statistical estimates with a stated confidence interval and a published
+              error rate. Recommendations are advisory; rostering decisions remain with the
+              operations manager.
+            </p>
+          </div>
+        </div>
+
+        <div className="footer-bar">
+          <span>OpsPulse · Logistics Operations Excellence</span>
+          <span>Aggregate-only by design</span>
+        </div>
+      </footer>
     </>
   );
 }
