@@ -26,11 +26,24 @@ app.use(
 app.use(express.json({ limit: '100kb' }));           // payload cap
 app.use(mongoSanitize());                            // strips $ and . - blocks NoSQL injection
 
-// Liveness/readiness probes sit ahead of the rate limiter so Kubernetes can never
-// throttle itself out of a healthy pod.
+// Probes sit ahead of the rate limiter so Kubernetes can never throttle itself out
+// of a healthy pod.
+//
+// Liveness and readiness answer different questions and must not share an endpoint:
+//   /api/health - is the process alive? Always 200 while it can respond. A failure
+//                 here means "restart me".
+//   /api/ready  - can it actually serve requests? 503 until the database is
+//                 connected, so a database blip removes the pod from the Service
+//                 rather than triggering a restart loop.
 app.get('/api/health', (req, res) =>
   res.json({ status: 'ok', service: 'opspulse-api', db: dbState(), uptimeSec: Math.round(process.uptime()) })
 );
+
+app.get('/api/ready', (req, res) => {
+  const db = dbState();
+  const ready = db === 'connected';
+  res.status(ready ? 200 : 503).json({ ready, db });
+});
 
 app.use(rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false }));
 
@@ -61,6 +74,14 @@ app.use((req, res) => res.status(404).json({ error: 'Not found', path: req.path 
 app.use((err, req, res, next) => {
   console.error('[error]', err.message);
   res.status(500).json({ error: 'Internal server error' }); // never leak a stack trace
+});
+
+// A wrapped route handler forwards its rejections to the error handler above, so
+// this should never fire. It is a last line of defence: Node terminates the process
+// on an unhandled rejection by default, and an API that dies because one request
+// misbehaved is worse than one that logs and keeps serving everyone else.
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandled rejection]', err instanceof Error ? err.message : err);
 });
 
 // --- Startup -------------------------------------------------------------------

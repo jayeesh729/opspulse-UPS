@@ -8,6 +8,7 @@ import { buildWorkforcePlan, planSummary } from '../engine/workforce.js';
 import { optimise } from '../engine/optimize.js';
 import { isoDate } from '../util/date.js';
 import { validate } from '../middleware/validate.js';
+import { wrap } from '../middleware/async.js';
 import { requireAuth, requireSiteAccess, requireReset } from '../middleware/auth.js';
 import { seedDatabase } from '../data/seed.js';
 import { explainPlan } from '../services/narrative.js';
@@ -78,21 +79,21 @@ router.get('/meta', (req, res) =>
   })
 );
 
-router.get('/sites', async (req, res) => {
+router.get('/sites', wrap(async (req, res) => {
   const scope = req.user.sites ?? [];
   const filter = scope.length ? { code: { $in: scope } } : {};
   const sites = await Site.find(filter).sort({ code: 1 }).lean();
   res.json(sites.map(({ code, name, region }) => ({ code, name, region })));
-});
+}));
 
-router.get('/kpis', validate(siteQuery), requireSiteAccess, async (req, res) => {
+router.get('/kpis', validate(siteQuery), requireSiteAccess, wrap(async (req, res) => {
   const { site, days } = req.validated;
   const { ops, standardsByFunction } = await loadSite(site, days);
   if (!ops.length) return res.status(404).json({ error: 'No data', detail: `No operations found for site ${site}` });
   res.json(computeKpis(ops, standardsByFunction));
-});
+}));
 
-router.get('/forecast', validate(forecastQuery), requireSiteAccess, async (req, res) => {
+router.get('/forecast', validate(forecastQuery), requireSiteAccess, wrap(async (req, res) => {
   const { site, function: fn, horizon } = req.validated;
   const series = await Operation.find({ siteCode: site, functionType: fn }).sort({ date: 1 }).lean();
   if (!series.length) return res.status(404).json({ error: 'No data', detail: `No history for ${site}/${fn}` });
@@ -105,9 +106,9 @@ router.get('/forecast', validate(forecastQuery), requireSiteAccess, async (req, 
     accuracy: backtest(series),
     anomalies: detectAnomalies(series),
   });
-});
+}));
 
-router.get('/workforce-plan', validate(planQuery), requireSiteAccess, async (req, res) => {
+router.get('/workforce-plan', validate(planQuery), requireSiteAccess, wrap(async (req, res) => {
   const { site, scenario } = req.validated;
   const [{ standardsByFunction, workforce }, forecastByFunction] = await Promise.all([
     loadSite(site, 30),
@@ -115,9 +116,9 @@ router.get('/workforce-plan', validate(planQuery), requireSiteAccess, async (req
   ]);
   const plan = buildWorkforcePlan({ forecastByFunction, standardsByFunction, workforce, scenario });
   res.json({ site, scenario, plan, summary: planSummary(plan) });
-});
+}));
 
-router.get('/optimize', validate(planQuery), requireSiteAccess, async (req, res) => {
+router.get('/optimize', validate(planQuery), requireSiteAccess, wrap(async (req, res) => {
   const { site, scenario } = req.validated;
   const [{ standardsByFunction, workforce }, forecastByFunction] = await Promise.all([
     loadSite(site, 30),
@@ -125,10 +126,10 @@ router.get('/optimize', validate(planQuery), requireSiteAccess, async (req, res)
   ]);
   const plan = buildWorkforcePlan({ forecastByFunction, standardsByFunction, workforce, scenario });
   res.json({ site, scenario, ...optimise(plan) });
-});
+}));
 
 /** One call powering the whole dashboard - fewer round trips, faster demo. */
-router.get('/overview', validate(planQuery), requireSiteAccess, async (req, res) => {
+router.get('/overview', validate(planQuery), requireSiteAccess, wrap(async (req, res) => {
   const { site, scenario, days } = req.validated;
   const [{ ops, standardsByFunction, workforce }, forecastByFunction] = await Promise.all([
     loadSite(site, days),
@@ -150,9 +151,9 @@ router.get('/overview', validate(planQuery), requireSiteAccess, async (req, res)
     alerts: buildAlerts(kpis, plan),
     forecastByFunction,
   });
-});
+}));
 
-router.post('/explain', async (req, res) => {
+router.post('/explain', wrap(async (req, res) => {
   const schema = z.object({
     site: siteCode,
     scenario: z.coerce.number().min(0.5).max(2.5).default(1),
@@ -177,11 +178,11 @@ router.post('/explain', async (req, res) => {
   const plan = buildWorkforcePlan({ forecastByFunction, standardsByFunction, workforce, scenario });
   const optimisation = optimise(plan);
   res.json(await explainPlan({ site, scenario, kpis, plan, optimisation }));
-});
+}));
 
-router.post('/admin/reset-demo', requireReset, async (req, res) => {
+router.post('/admin/reset-demo', requireReset, wrap(async (req, res) => {
   const result = await seedDatabase();
   res.json({ ok: true, ...result });
-});
+}));
 
 export default router;
