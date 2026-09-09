@@ -53,10 +53,9 @@ export default function Dashboard({ data, site, scenario, role }) {
       <div className="grid k3" style={{ marginBottom: 16 }}>
         {Object.entries(kpis.byFunction).map(([fn, m]) => (
           <div className="card" key={fn} style={{ marginBottom: 0 }}>
-            <h2 style={{ textTransform: 'capitalize' }}>
+            <h2 style={{ textTransform: 'capitalize', marginBottom: 12 }}>
               {fn} <span className={`pill ${band(m.oei)}`}>OEI {m.oei}</span>
             </h2>
-            <div className="sub">The index decomposed — so it can be argued with, not just trusted</div>
             <table>
               <tbody>
                 <tr>
