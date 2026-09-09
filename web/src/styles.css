@@ -212,6 +212,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   border: 1px solid rgba(255, 255, 255, 0.45);
   padding: 7px 14px;
   font-weight: 500;
+  /* The topbar is a flex container: without these the button gets squeezed and
+     "Sign out" wraps onto two lines that overflow the bar, leaving what looks like
+     an empty box. */
+  white-space: nowrap;
+  flex: 0 0 auto;
+  align-self: center;
 }
 .btn.signout:hover { background: rgba(255, 255, 255, 0.14); border-color: #fff; }
 .btn.signout:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
